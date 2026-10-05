@@ -31,7 +31,7 @@ below.
 
 | Category | Tools |
 |---|---|
-| Core | Git, Windows Terminal, Neovim, .NET Desktop Runtime 9 |
+| Core | Git, GitHub CLI, Windows Terminal, Neovim, .NET Desktop Runtime 9 |
 | AI / agent tooling | Claude (desktop app), Claude Code (CLI), Antigravity IDE, Antigravity CLI (`agy`) |
 | Editor | Visual Studio Code |
 | Languages & runtimes | Node.js (LTS), Bun, Python 3.13, Rust (via Rustup) + rust-analyzer, jabba (JDK manager) |
@@ -113,7 +113,7 @@ Install only a named subset instead of everything, for a specific stack:
 | Profile | Installs |
 |---|---|
 | `all` (default) | Every package in `configuration.dsc.yaml` |
-| `java-kotlin` | Git, VS Code, jabba, Podman (CLI), DBeaver Community — everything needed for Java/Kotlin + Spring Boot + PostgreSQL + Git, nothing else |
+| `java-kotlin` | Git, GitHub CLI, VS Code, jabba, Podman (CLI), DBeaver Community — everything needed for Java/Kotlin + Spring Boot + PostgreSQL + Git, nothing else |
 
 A non-`all` profile automatically skips the Visual Studio Build Tools step too (no C++
 toolchain needed for JVM languages); pass `-SkipBuildTools:$false` to force it anyway.

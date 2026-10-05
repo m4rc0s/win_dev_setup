@@ -42,6 +42,15 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: githubCli
+      directives:
+        description: GitHub CLI - create/manage PRs and issues from the terminal
+        allowPrerelease: true
+      settings:
+        id: GitHub.cli
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: windowsTerminal
       directives:
         description: Windows Terminal
@@ -242,11 +251,6 @@ properties:
     #   settings: { id: GoLang.Go, source: winget }
     #
     # --- Git / dev tooling ---
-    # - resource: Microsoft.WinGet.DSC/WinGetPackage
-    #   id: githubCli
-    #   directives: { description: GitHub CLI, allowPrerelease: true }
-    #   settings: { id: GitHub.cli, source: winget }
-    #
     # - resource: Microsoft.WinGet.DSC/WinGetPackage
     #   id: sevenZip
     #   directives: { description: 7-Zip, allowPrerelease: true }

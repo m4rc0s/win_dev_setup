@@ -65,6 +65,7 @@ $ErrorActionPreference = 'Stop'
 $script:Profiles = @{
     'java-kotlin' = @(
         'Git.Git',                       # version control
+        'GitHub.cli',                    # create/manage PRs and issues from the terminal
         'Microsoft.VisualStudioCode',    # editor (see vscode/ for the dotfiles)
         'jabba-team.jabba',              # JDK/JVM version manager
         'Podman.CLI',                    # run PostgreSQL via container
