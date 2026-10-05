@@ -54,6 +54,17 @@ function Get-ExtensionIds {
         Where-Object { $_ -and -not $_.StartsWith('#') }
 }
 
+function New-FileSymlink {
+    # PowerShell 5.1's `New-Item -ItemType SymbolicLink` requires full admin
+    # privilege and ignores Windows' "Developer Mode" unprivileged-symlink
+    # allowance. `mklink` (cmd.exe) respects it correctly, so use that instead.
+    # Returns $true on success, $false on failure (caller decides the fallback).
+    param([string]$Path, [string]$Target)
+
+    $output = cmd /c "mklink `"$Path`" `"$Target`"" 2>&1
+    return (Test-Path $Path) -and ((Get-Item $Path -Force).LinkType -eq 'SymbolicLink')
+}
+
 Write-Host '==> Checking for the VS Code CLI (code)...' -ForegroundColor Cyan
 $code = Resolve-CodeCli
 
@@ -107,10 +118,9 @@ if (Test-Path $target) {
     Remove-Item -Path $target -Force
 }
 
-try {
-    New-Item -ItemType SymbolicLink -Path $target -Target $SettingsFile -ErrorAction Stop | Out-Null
+if (New-FileSymlink -Path $target -Target $SettingsFile) {
     Write-Host '    Linked (symlink) - edits to vscode\settings.json take effect immediately.' -ForegroundColor Green
-} catch {
+} else {
     Write-Host '    Symlink creation failed (needs Developer Mode or admin) - copying instead.' -ForegroundColor Yellow
     Write-Host '    Re-run this script after editing vscode\settings.json to re-apply.' -ForegroundColor DarkGray
     Copy-Item -Path $SettingsFile -Destination $target -Force
