@@ -5,5 +5,21 @@ winget-export.json
 # Logs
 *.log
 
-# Local Claude Code session resume notes
+# Secrets / machine-local environment
+.env
+.env.*
+*.secrets.yaml
+
+# Claude Code: local-only settings and session notes (never shared)
+.claude/settings.local.json
 .claude-resume.md
+
+# Editor-local project settings (NOT the tracked vscode/ dotfiles profile,
+# which is this repo's actual content and stays tracked)
+.vscode/
+.idea/
+
+# OS junk
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
