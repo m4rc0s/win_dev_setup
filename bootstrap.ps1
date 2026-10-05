@@ -42,15 +42,35 @@ param(
     [string]$ConfigFile = (Join-Path $PSScriptRoot 'configuration.dsc.yaml'),
 
     # Skip the Visual Studio Build Tools step (e.g. if you already have a C++
-    # toolchain installed some other way).
+    # toolchain installed some other way). Auto-skipped for profiles that don't
+    # need a C++ toolchain, unless explicitly overridden.
     [switch]$SkipBuildTools,
 
     # Use `winget configure` (DSC) instead of the default plain-install loop.
     # Requires `winget configure --enable` to have been run once, as admin.
-    [switch]$UseConfiguration
+    # Not compatible with -Profile (other than 'all').
+    [switch]$UseConfiguration,
+
+    # Install only a named subset of configuration.dsc.yaml instead of
+    # everything. 'all' (default) installs the full file.
+    [ValidateSet('all', 'java-kotlin')]
+    [string]$Profile = 'all'
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Named subsets of configuration.dsc.yaml for scoped runs. Keep ids in sync
+# with configuration.dsc.yaml by hand - this is a small, deliberately curated
+# list per profile, not a derived filter.
+$script:Profiles = @{
+    'java-kotlin' = @(
+        'Git.Git',                       # version control
+        'Microsoft.VisualStudioCode',    # editor (see vscode/ for the dotfiles)
+        'jabba-team.jabba',              # JDK/JVM version manager
+        'Podman.CLI',                    # run PostgreSQL via container
+        'DBeaver.DBeaver.Community'      # PostgreSQL client/GUI
+    )
+}
 
 function Resolve-Winget {
     # Try PATH first; otherwise fall back to the known App Installer path.
@@ -100,6 +120,17 @@ if (-not (Test-Path $ConfigFile)) {
     exit 1
 }
 
+if ($UseConfiguration -and $Profile -ne 'all') {
+    Write-Error "-Profile '$Profile' is not supported together with -UseConfiguration (which always applies the whole file). Drop -UseConfiguration, or use -Profile all."
+    exit 1
+}
+
+# Profiles other than 'all' are JVM-only right now - no C++ toolchain needed.
+# Auto-skip Build Tools unless the caller explicitly asked for a value.
+if ($Profile -ne 'all' -and -not $PSBoundParameters.ContainsKey('SkipBuildTools')) {
+    $SkipBuildTools = $true
+}
+
 # --- Visual Studio 2022 Build Tools (C++ workload) --------------------------
 # Needed for: the Rust MSVC toolchain (link.exe) and compiling native Python
 # extensions. Installed as a direct `winget install` call (not via the DSC
@@ -143,12 +174,20 @@ if ($UseConfiguration) {
     }
 } else {
     # --- Default path: plain install loop, no feature flag required ---------
-    $ids = Get-PackageIdsFromConfig -Path $ConfigFile
+    if ($Profile -eq 'all') {
+        $ids = Get-PackageIdsFromConfig -Path $ConfigFile
+    } else {
+        $ids = $script:Profiles[$Profile]
+    }
 
     if (-not $ids -or $ids.Count -eq 0) {
-        Write-Warning "No package ids found in $ConfigFile - nothing to install."
+        Write-Warning "No package ids found for profile '$Profile' - nothing to install."
     } else {
-        Write-Host "==> Installing $($ids.Count) packages from $ConfigFile" -ForegroundColor Cyan
+        if ($Profile -eq 'all') {
+            Write-Host "==> Installing $($ids.Count) packages from $ConfigFile" -ForegroundColor Cyan
+        } else {
+            Write-Host "==> Profile '$Profile': installing $($ids.Count) packages (subset of $ConfigFile)" -ForegroundColor Cyan
+        }
         Write-Host '    (winget will show its own UAC prompt per package if one needs elevation)' -ForegroundColor DarkGray
 
         $failed = @()

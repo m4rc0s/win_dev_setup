@@ -17,7 +17,8 @@ on Windows** — no WSL, no Linux layer required.
 | File | Purpose |
 |---|---|
 | `configuration.dsc.yaml` | **The heart of the setup.** Declarative list of every program (the machine's desired state). This is the file you edit. |
-| `bootstrap.ps1` | Script that checks winget, installs the one prerequisite the declarative file can't express (Visual Studio Build Tools' C++ workload), and applies the configuration. This is the file you run. |
+| `bootstrap.ps1` | Script that checks winget, installs the one prerequisite the declarative file can't express (Visual Studio Build Tools' C++ workload), and installs the packages (everything, or a `-Profile` subset). This is the file you run. |
+| `vscode/` | VS Code "dotfiles" — tracked `settings.json` and `extensions.txt`, applied with `vscode\install.ps1`. See [VS Code profile](#-vs-code-profile-dotfiles) below. |
 | `README.md` | This file. |
 
 ---
@@ -75,8 +76,8 @@ The script:
    plain `winget install` call.
 
 **No admin pre-step and no elevated terminal needed.** A handful of packages (e.g.
-Docker Desktop) may trigger their own UAC prompt mid-install — just click through it
-when it appears.
+Visual Studio Build Tools) may trigger their own UAC prompt mid-install — just click
+through it when it appears.
 
 If script execution is blocked, allow it just for the current session:
 
@@ -90,6 +91,24 @@ Already have a C++ toolchain and want to skip that step:
 ```powershell
 .\bootstrap.ps1 -SkipBuildTools
 ```
+
+### Scoped runs: `-Profile`
+
+Install only a named subset instead of everything, for a specific stack:
+
+```powershell
+.\bootstrap.ps1 -Profile java-kotlin
+```
+
+| Profile | Installs |
+|---|---|
+| `all` (default) | Every package in `configuration.dsc.yaml` |
+| `java-kotlin` | Git, VS Code, jabba, Podman (CLI), DBeaver Community — everything needed for Java/Kotlin + Spring Boot + PostgreSQL + Git, nothing else |
+
+A non-`all` profile automatically skips the Visual Studio Build Tools step too (no C++
+toolchain needed for JVM languages); pass `-SkipBuildTools:$false` to force it anyway.
+Profiles are hand-curated lists inside `bootstrap.ps1` (not derived from the YAML), so
+adding a new one means editing the `$script:Profiles` hashtable there.
 
 ### Alternative: `winget configure` (DSC engine)
 
@@ -139,6 +158,42 @@ podman run hello-world   # sanity check
 
 # 5) Sign in where needed: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver.
 ```
+
+---
+
+## 🧩 VS Code profile (dotfiles)
+
+`vscode/` holds a tracked, version-controlled VS Code user profile — extensions +
+settings — tuned for Java + Kotlin + Spring Boot + PostgreSQL + Git. Apply it once VS
+Code itself is installed:
+
+```powershell
+cd vscode
+.\install.ps1
+```
+
+| File | Role |
+|---|---|
+| `vscode/extensions.txt` | One extension id per line (`#` for comments/optional ones). Installed via `code --install-extension`. |
+| `vscode/settings.json` | User settings. **Symlinked** into `%APPDATA%\Code\User\settings.json` when possible (falls back to a plain copy if symlinks aren't permitted — enable *Developer Mode* in Windows Settings to allow them without admin). |
+| `vscode/install.ps1` | Applies both of the above. Safe to re-run any time after editing either file. |
+
+### What's included
+
+| Extension | Why |
+|---|---|
+| `vscjava.vscode-java-pack` | Java language support, debugger, test runner, Maven, dependency viewer, IntelliCode |
+| `vmware.vscode-boot-dev-pack` | Spring Boot Tools, Spring Initializr, Spring Boot Dashboard |
+| `jetbrains.kotlin-server` | Official Kotlin language support (JetBrains, powered by the Kotlin Language Server) |
+| `ms-ossdata.vscode-pgsql` | PostgreSQL: connect, browse, query with IntelliSense, without leaving the editor |
+| `eamodio.gitlens` | Richer Git tooling on top of VS Code's built-in support |
+
+`extensions.txt` also has a commented-out "nice to have" section (REST Client, YAML
+schema validation, EditorConfig) — uncomment what you want.
+
+`settings.json` deliberately does **not** hardcode a JDK path: the active JDK is
+resolved via `JAVA_HOME`, which `jabba` manages, so switching JDKs with `jabba use`
+is picked up automatically (restart VS Code after switching).
 
 ---
 
