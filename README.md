@@ -7,8 +7,11 @@ consistent.
 
 It uses **[winget](https://learn.microsoft.com/windows/package-manager/)** (the official
 Windows package manager) with **Configuration / DSC**: you describe *what* you want
-installed, and winget figures out *how* to reach that state. Everything runs **natively
-on Windows** — no WSL, no Linux layer required.
+installed, and winget figures out *how* to reach that state. The toolchain itself runs
+**natively on Windows** — no WSL needed to write or run code day-to-day. WSL2 is used
+underneath as Podman's machine backend (its VM has to live somewhere), and optionally
+for SDKMAN-based JDK management on the Linux side — see [WSL extras](#-wsl-extras-optional)
+below.
 
 ---
 
@@ -19,6 +22,7 @@ on Windows** — no WSL, no Linux layer required.
 | `configuration.dsc.yaml` | **The heart of the setup.** Declarative list of every program (the machine's desired state). This is the file you edit. |
 | `bootstrap.ps1` | Script that checks winget, installs the one prerequisite the declarative file can't express (Visual Studio Build Tools' C++ workload), and installs the packages (everything, or a `-Profile` subset). This is the file you run. |
 | `vscode/` | VS Code "dotfiles" — tracked `settings.json` and `extensions.txt`, applied with `vscode\install.ps1`. See [VS Code profile](#-vs-code-profile-dotfiles) below. |
+| `wsl/install-sdkman.sh` | Installs SDKMAN inside a WSL distro. See [WSL extras](#-wsl-extras-optional) below. |
 | `README.md` | This file. |
 
 ---
@@ -38,11 +42,14 @@ on Windows** — no WSL, no Linux layer required.
 
 ### Notes on a couple of choices
 
-- **JDK/JVM switching: `jabba`, not SDKMAN.** SDKMAN is a bash/Linux tool; on native
-  Windows it only works through workarounds (Git Bash plus manually-installed `zip`/
-  `unzip`, or WSL). Since this setup stays 100% native, it uses
+- **JDK/JVM switching on Windows: `jabba`, not SDKMAN.** SDKMAN is a bash/Linux tool; on
+  native Windows it only works through workarounds (Git Bash plus manually-installed
+  `zip`/`unzip`, or WSL). For the native-Windows side, this setup uses
   **[jabba](https://github.com/shyiko/jabba)** instead — same idea (`jabba install`,
   `jabba use`), but works directly in PowerShell. See [Post-install steps](#-post-install-steps-one-time).
+  SDKMAN is also supported, but **inside WSL only**, for Linux-side JVM work — see
+  [WSL extras](#-wsl-extras-optional). These are two separate JDKs for two separate
+  environments, not a replacement for jabba.
 - **"Antigravity" is two different Google products in the winget catalog**: `Google.Antigravity`
   (a standalone agent-orchestration hub) and `Google.AntigravityIDE` (the actual code
   editor) + `Google.AntigravityCLI` (the terminal client, `agy`). This setup installs the
@@ -54,7 +61,10 @@ on Windows** — no WSL, no Linux layer required.
   kind of VM from the command line instead (`podman machine init` / `podman machine
   start`), so there's no desktop app, no GUI, and no Docker Desktop licensing to think
   about. Podman's CLI is drop-in Docker-compatible — `Set-Alias docker podman` in your
-  PowerShell profile if you want the literal `docker` command to work too.
+  PowerShell profile if you want the literal `docker` command to work too. The machine's
+  backend is **WSL2** (installed separately — see [WSL extras](#-wsl-extras-optional));
+  this is the one case where this setup does reach for WSL, since Podman on Windows has
+  no other way to run a Linux VM.
 
 ---
 
@@ -151,13 +161,55 @@ jabba alias default temurin@21
 # 3) Set the default Rust toolchain
 rustup default stable-msvc
 
-# 4) Provision the Podman container engine (one-time, CLI only):
+# 4) Provision the Podman container engine (one-time, CLI only).
+#    Requires WSL2 with at least one distro installed - see WSL extras below.
 podman machine init
 podman machine start
 podman run hello-world   # sanity check
 
 # 5) Sign in where needed: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver.
 ```
+
+---
+
+## 🐧 WSL extras (optional)
+
+WSL2 isn't installed by this repo's scripts — it's a Windows feature you install and
+manage yourself (`wsl --install`). Two things in this setup build on it once it's there:
+
+- **Podman's machine backend.** `podman machine init` / `podman machine start` (see
+  [Post-install steps](#-post-install-steps-one-time)) provisions its Linux VM on top of
+  WSL2. A WSL distro must exist before you run those commands.
+- **SDKMAN, for JVM work done from inside WSL.** From inside a WSL shell (not
+  PowerShell), with the repo reachable at `/mnt/c/...`:
+
+  ```bash
+  bash wsl/install-sdkman.sh
+  ```
+
+  This installs SDKMAN itself; it doesn't install a JDK for you. This is entirely
+  separate from `jabba`, which keeps managing the JDK used on the native-Windows side
+  (see [Notes on a couple of choices](#notes-on-a-couple-of-choices)).
+
+### Known issue: Podman + WSL 3.0.1 cgroup error
+
+With WSL 3.0.1, `podman run` can fail with:
+
+```
+Error: preparing container ... crun: controller `pids` is not available ... OCI runtime error
+```
+
+This is a WSL 3.0.1 regression in how it exposes cgroup controllers into the distro, not
+a Podman misconfiguration. Fix it by switching Podman's cgroup manager to `cgroupfs`,
+in `%APPDATA%\containers\containers.conf`:
+
+```toml
+[engine]
+cgroup_manager="cgroupfs"
+```
+
+Create the file (and the `containers` folder) if it doesn't exist yet, then re-run
+`podman run hello-world`.
 
 ---
 
@@ -246,7 +298,8 @@ winget upgrade --all
   If missing: <https://aka.ms/getwinget>.
 - System apps, games, and drivers (e.g. Steam, NVIDIA drivers, Store apps) are **left
   out on purpose** — this setup focuses on development tooling.
-- This setup is intentionally **native-Windows-only** (no WSL). If you later want a
-  Linux-flavored toolchain (e.g. the real SDKMAN, `apt`-based tooling) alongside this,
-  that would live in a separate script run inside WSL — it's a deliberately separate
-  concern from this repo.
+- The native-Windows toolchain is the main focus of this repo. WSL2 only comes in as
+  Podman's machine backend and, optionally, for SDKMAN-based JVM work — see
+  [WSL extras](#-wsl-extras-optional). Installing WSL2 itself, and any further
+  Linux-side tooling beyond `wsl/install-sdkman.sh` (e.g. `apt`-based tooling), is left
+  to you — it's a deliberately separate concern from the native-Windows winget flow.
