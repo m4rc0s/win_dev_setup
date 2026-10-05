@@ -4,3 +4,6 @@ winget-export.json
 
 # Logs
 *.log
+
+# Local Claude Code session resume notes
+.claude-resume.md
