@@ -1,0 +1,6 @@
+# Generated winget export snapshots
+winget-export.json
+*.export.json
+
+# Logs
+*.log
