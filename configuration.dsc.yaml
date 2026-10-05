@@ -181,23 +181,22 @@ properties:
     # script if you want to inspect or change the workload selection.
 
     # ============================= CONTAINERS =================================
+    # CLI-only, no Docker Desktop / no GUI. Linux containers on Windows always
+    # need a VM underneath regardless of tool - Podman just provisions it via
+    # `podman machine` from the command line instead of a desktop app.
+    # First-time setup (one-time, manual):
+    #   podman machine init
+    #   podman machine start
+    # `docker` scripts/docs work unchanged: `Set-Alias docker podman` in your
+    # PowerShell profile, since Podman's CLI is drop-in Docker-compatible.
 
     - resource: Microsoft.WinGet.DSC/WinGetPackage
-      id: dockerDesktop
+      id: podman
       directives:
-        description: Docker Desktop
+        description: Podman CLI - daemonless, Docker-compatible container engine
         allowPrerelease: true
       settings:
-        id: Docker.DockerDesktop
-        source: winget
-
-    - resource: Microsoft.WinGet.DSC/WinGetPackage
-      id: podmanDesktop
-      directives:
-        description: Podman Desktop (bundles the podman CLI and machine)
-        allowPrerelease: true
-      settings:
-        id: RedHat.Podman-Desktop
+        id: Podman.CLI
         source: winget
 
     # ============================== DATABASES =================================

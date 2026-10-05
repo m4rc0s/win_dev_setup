@@ -30,7 +30,7 @@ on Windows** — no WSL, no Linux layer required.
 | AI / agent tooling | Claude (desktop app), Claude Code (CLI), Antigravity IDE, Antigravity CLI (`agy`) |
 | Editor | Visual Studio Code |
 | Languages & runtimes | Node.js (LTS), Bun, Python 3.13, Rust (via Rustup) + rust-analyzer, jabba (JDK manager) |
-| Containers | Docker Desktop, Podman Desktop |
+| Containers | Podman (CLI only, no Docker Desktop / no GUI) |
 | Databases | DBeaver Community |
 | Media | Spotify |
 | Build prerequisite | Visual Studio 2022 Build Tools (C++ workload) — installed by `bootstrap.ps1`, not in the DSC file |
@@ -47,9 +47,13 @@ on Windows** — no WSL, no Linux layer required.
   editor) + `Google.AntigravityCLI` (the terminal client, `agy`). This setup installs the
   **IDE + CLI** pair. If you actually wanted the orchestration hub instead (or as well),
   edit `configuration.dsc.yaml` and uncomment/add the `Google.Antigravity` block.
-- **Docker Desktop and Podman Desktop** are both included, as requested. Both provision
-  their own container backend (a managed Windows VM/WSL distro) on first launch — that's
-  how containers work on Windows, independent of anything else in this setup.
+- **Podman, CLI only — no Docker Desktop.** Linux containers can't run on the Windows
+  kernel directly; some VM has to sit underneath no matter which tool you use. Docker
+  Desktop and Podman Desktop just wrap that VM in a GUI app. Podman provisions the same
+  kind of VM from the command line instead (`podman machine init` / `podman machine
+  start`), so there's no desktop app, no GUI, and no Docker Desktop licensing to think
+  about. Podman's CLI is drop-in Docker-compatible — `Set-Alias docker podman` in your
+  PowerShell profile if you want the literal `docker` command to work too.
 
 ---
 
@@ -128,8 +132,10 @@ jabba alias default temurin@21
 # 3) Set the default Rust toolchain
 rustup default stable-msvc
 
-# 4) Launch Docker Desktop and/or Podman Desktop once each - they provision
-#    their own container backend on first run.
+# 4) Provision the Podman container engine (one-time, CLI only):
+podman machine init
+podman machine start
+podman run hello-world   # sanity check
 
 # 5) Sign in where needed: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver.
 ```

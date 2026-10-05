@@ -192,8 +192,9 @@ Write-Host '         jabba use temurin@21'
 Write-Host '         jabba alias default temurin@21'
 Write-Host '    3) Set the default Rust toolchain:'
 Write-Host '         rustup default stable-msvc'
-Write-Host '    4) Launch Docker Desktop and/or Podman Desktop once to finish their'
-Write-Host '       first-run setup (they provision their own Windows container backend).'
+Write-Host '    4) Provision the Podman container engine (one-time, CLI only):'
+Write-Host '         podman machine init'
+Write-Host '         podman machine start'
 Write-Host '    5) Sign in: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver connections.'
 
 exit $exit
