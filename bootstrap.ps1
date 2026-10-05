@@ -9,9 +9,12 @@
     2. Installs Visual Studio 2022 Build Tools with the C++ workload (prerequisite
        for the Rust MSVC toolchain and native Python extensions) - this needs
        installer override arguments that the declarative file cannot express.
-    3. Reads the package ids out of configuration.dsc.yaml and installs each one
+    3. Installs the Spring Boot CLI (`spring init`) by downloading its official
+       bin.zip from Maven Central and adding it to PATH - no winget package
+       exists for it.
+    4. Reads the package ids out of configuration.dsc.yaml and installs each one
        with a plain `winget install` call.
-    4. Prints the remaining one-time manual steps (JDK via jabba, Rust default
+    5. Prints the remaining one-time manual steps (JDK via jabba, Rust default
        toolchain, container engines first run).
 
     Run from the project folder:
@@ -45,6 +48,16 @@ param(
     # toolchain installed some other way). Auto-skipped for profiles that don't
     # need a C++ toolchain, unless explicitly overridden.
     [switch]$SkipBuildTools,
+
+    # Skip installing the Spring Boot CLI (gives you `spring init` to scaffold
+    # Java/Kotlin projects from the terminal). Auto-skipped for profiles that
+    # don't need it, unless explicitly overridden.
+    [switch]$SkipSpringCli,
+
+    # Spring Boot CLI version to install. Keep in sync with the Spring Boot
+    # version used elsewhere (see README's compatibility notes) - pin it
+    # deliberately rather than always grabbing "latest".
+    [string]$SpringCliVersion = '3.5.16',
 
     # Use `winget configure` (DSC) instead of the default plain-install loop.
     # Requires `winget configure --enable` to have been run once, as admin.
@@ -138,6 +151,12 @@ if ($Profile -ne 'all' -and -not $PSBoundParameters.ContainsKey('SkipBuildTools'
     $SkipBuildTools = $true
 }
 
+# Only 'all' and 'java-kotlin' do Java/Kotlin work. Auto-skip the Spring Boot
+# CLI for 'utilities' unless the caller explicitly asked for a value.
+if ($Profile -eq 'utilities' -and -not $PSBoundParameters.ContainsKey('SkipSpringCli')) {
+    $SkipSpringCli = $true
+}
+
 # --- Visual Studio 2022 Build Tools (C++ workload) --------------------------
 # Needed for: the Rust MSVC toolchain (link.exe) and compiling native Python
 # extensions. Installed as a direct `winget install` call (not via the DSC
@@ -158,6 +177,63 @@ if (-not $SkipBuildTools) {
         Write-Host '    OK.' -ForegroundColor Green
     } else {
         Write-Warning "Build Tools install returned exit code $LASTEXITCODE. Continuing anyway - review the output above."
+    }
+}
+
+# --- Spring Boot CLI (`spring init` from the terminal) ----------------------
+# No winget package exists for this, so it's installed the same way the
+# official docs describe for Windows without SDKMAN/Scoop: download the
+# official bin.zip from Maven Central, extract it, and add its bin/ to PATH.
+# Gives you `spring init -l=kotlin -d=web --build=gradle my-app` (or -l=java)
+# to scaffold a project without opening a browser to start.spring.io.
+if (-not $SkipSpringCli) {
+    Write-Host "==> Installing Spring Boot CLI $SpringCliVersion (spring init)..." -ForegroundColor Cyan
+    Write-Host '    (skip with -SkipSpringCli)' -ForegroundColor DarkGray
+
+    $springInstallRoot = Join-Path $HOME '.spring-boot-cli'
+    $springVersionDir = Join-Path $springInstallRoot "spring-boot-cli-$SpringCliVersion"
+    $springBat = Get-ChildItem -Path $springVersionDir -Filter 'spring.bat' -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+
+    if ($springBat) {
+        Write-Host "    Already installed at $($springBat.DirectoryName)." -ForegroundColor Green
+    } else {
+        $zipUrl = "https://repo1.maven.org/maven2/org/springframework/boot/spring-boot-cli/$SpringCliVersion/spring-boot-cli-$SpringCliVersion-bin.zip"
+        $zipPath = Join-Path $env:TEMP "spring-boot-cli-$SpringCliVersion-bin.zip"
+
+        try {
+            Write-Host "    Downloading $zipUrl" -ForegroundColor DarkGray
+            Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+
+            New-Item -ItemType Directory -Force -Path $springVersionDir | Out-Null
+            Expand-Archive -Path $zipPath -DestinationPath $springVersionDir -Force
+            Remove-Item $zipPath -Force
+
+            $springBat = Get-ChildItem -Path $springVersionDir -Filter 'spring.bat' -Recurse -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if (-not $springBat) {
+                throw "spring.bat not found after extracting - archive layout may have changed."
+            }
+            Write-Host "    OK. Installed to $($springBat.DirectoryName)." -ForegroundColor Green
+        } catch {
+            Write-Warning "    Spring Boot CLI install failed: $_. Continuing anyway - review the output above."
+            $springBat = $null
+        }
+    }
+
+    if ($springBat) {
+        $springBinPath = $springBat.DirectoryName
+        $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+        $pathEntries = $userPath -split ';' | Where-Object { $_ }
+
+        if ($pathEntries -notcontains $springBinPath) {
+            # Drop any bin/ dir from an older spring-boot-cli version first, so
+            # re-running this after a version bump doesn't leave two on PATH.
+            $pathEntries = $pathEntries | Where-Object { $_ -notlike (Join-Path $springInstallRoot '*\bin') }
+            $newPath = ($pathEntries + $springBinPath) -join ';'
+            [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+            Write-Host "    Added $springBinPath to your User PATH (open a new terminal to pick it up)." -ForegroundColor Green
+        }
     }
 }
 
@@ -232,15 +308,23 @@ Write-Host ''
 Write-Host '==> One-time manual steps still needed:' -ForegroundColor Cyan
 Write-Host '    1) Open a NEW terminal (so updated PATH entries take effect).'
 Write-Host '    2) Install a JDK and set it as default with jabba:'
-Write-Host '         jabba ls-remote                  # list available JDKs'
-Write-Host '         jabba install temurin@21          # example: Temurin 21 LTS'
+Write-Host '         jabba install temurin@21          # recommended default - see README'
 Write-Host '         jabba use temurin@21'
 Write-Host '         jabba alias default temurin@21'
-Write-Host '    3) Set the default Rust toolchain:'
+Write-Host '       Temurin 21 (LTS), not the newest LTS, is the recommended default: Kotlin,'
+Write-Host '       the AWS SDK and most Gradle plugins validate against it first. See the'
+Write-Host '       "Java/Kotlin + Spring Boot project checklist" section in README.md before'
+Write-Host '       picking a newer JDK as default.'
+Write-Host '       Verify it actually took in a NEW terminal: $env:JAVA_HOME. On this image,'
+Write-Host '       jabba''s PowerShell integration can silently fail to persist the switch -'
+Write-Host '       see "jabba use does not stick" in README.md if $env:JAVA_HOME is unchanged.'
+Write-Host '    3) Scaffold a Java or Kotlin project from the terminal with the Spring Boot CLI:'
+Write-Host '         spring init -l=kotlin -d=web --build=gradle my-app   # or -l=java'
+Write-Host '    4) Set the default Rust toolchain:'
 Write-Host '         rustup default stable-msvc'
-Write-Host '    4) Provision the Podman container engine (one-time, CLI only):'
+Write-Host '    5) Provision the Podman container engine (one-time, CLI only):'
 Write-Host '         podman machine init'
 Write-Host '         podman machine start'
-Write-Host '    5) Sign in: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver connections.'
+Write-Host '    6) Sign in: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver connections.'
 
 exit $exit

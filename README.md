@@ -231,6 +231,79 @@ is picked up automatically (restart VS Code after switching).
 
 ---
 
+## ✅ Java/Kotlin + Spring Boot project checklist
+
+Things that bit us in practice when opening a fresh Gradle + Kotlin + Spring Boot
+project in VS Code on this setup. None of these are bugs in the extensions - they're
+gotchas worth knowing up front.
+
+- **Default JDK: use Temurin 21, not the newest LTS.** `jabba alias default` picks
+  what every Gradle daemon runs on unless a project overrides it. Kotlin's compiler
+  (and the AWS SDK, and most Gradle plugins) validate against JDK 21 first and lag
+  behind brand-new LTS releases by months - e.g. Kotlin 1.9.x doesn't even recognize
+  JDK 25 as a valid `jvmTarget`, and the Kotlin compiler daemon can crash outright if
+  the Gradle daemon itself launches on a JDK string it doesn't know how to parse.
+  Install newer JDKs with `jabba install` freely, just don't make them `default`.
+- **"jabba use does not stick"**: on this image, `jabba use <x>` / `jabba alias
+  default <x>` can silently fail to persist `JAVA_HOME`/`PATH`, for two stacked
+  reasons we hit live: (1) `~/.jabba/jabba.ps1` (the official PowerShell
+  integration) hardcodes the binary path to `~/.jabba/bin/jabba.exe`, but the
+  **winget** package installs `jabba.exe` somewhere else entirely, so sourcing it
+  errors with `jabba.exe : term not recognized`; and (2) even after copying the
+  binary into place, this build of `jabba.exe` emits **POSIX `export ...`** lines
+  through its `--fd3` protocol instead of PowerShell syntax, so the wrapper's
+  `Invoke-Expression` fails on `export` and nothing gets applied. **Always verify
+  in a brand-new terminal** (`$env:JAVA_HOME`) after switching. If it didn't take,
+  set it directly instead of fighting jabba:
+  ```powershell
+  $jdk = "$HOME\.jabba\jdk\temurin@21.0"   # or the exact version folder
+  [Environment]::SetEnvironmentVariable('JAVA_HOME', $jdk, 'User')
+  # then replace the old \.jabba\jdk\...\bin entry in the User PATH with "$jdk\bin"
+  ```
+  Changes made this way only show up in **new** processes (new terminal, restart
+  VS Code) - already-open shells keep the environment they started with.
+- **Every Gradle project needs its wrapper committed** (`gradlew` / `gradlew.bat` +
+  `gradle/wrapper/`). This machine has no global `gradle` install on PATH by design
+  (wrapper-only is the reproducible choice) - without it, VS Code's ▶ Run button on a
+  `main()` fails with `gradle.bat : command not found`.
+- **First Gradle project opened on a fresh machine is slow.** With no `~/.gradle`
+  cache yet, Gradle downloads itself (~100+ MB) before anything else happens -
+  expect ~1-2 minutes with no IntelliSense/errors shown. That's normal, not a hang.
+- **If a project must target a JDK other than the jabba default**, don't rely on
+  `kotlin { jvmToolchain(N) }` alone - it sets the compile target but not reliably
+  which JVM the Gradle/Kotlin compiler daemon itself runs on. Pin it explicitly in
+  that project's `gradle.properties`:
+  ```properties
+  org.gradle.java.home=C:\\Users\\<you>\\.jabba\\jdk\\temurin@21.0
+  ```
+  and add the toolchain auto-provisioning plugin to `settings.gradle.kts` so Gradle
+  can fetch a JDK it doesn't have locally:
+  ```kotlin
+  plugins {
+      id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+  }
+  ```
+- **`vmware.vscode-spring-boot` has limited Kotlin support.** It's built on the Java
+  (Eclipse JDT) AST, so Spring-aware features (bean navigation, `application.yml`
+  completion driven by annotations) mostly work on `.java`, not `.kt`. You may see a
+  background `FileNotFoundException ... build\classes\kotlin\main (Access denied)`
+  in its output log on Kotlin projects - that's a known, non-fatal limitation of the
+  extension's "stereotype catalog" indexing, not a broken setup. Plain code
+  navigation (go to definition, find usages) is handled by `jetbrains.kotlin-server`
+  instead and is unaffected.
+- **Scaffolding a new project**: `bootstrap.ps1` installs the Spring Boot CLI (no
+  winget package exists for it, so it's downloaded from Maven Central and added to
+  PATH directly - see `-SkipSpringCli` / `-SpringCliVersion` if you need to opt out
+  or pin a different release). Once installed:
+  ```powershell
+  spring init -l=kotlin -d=web --build=gradle my-app   # Kotlin + Gradle
+  spring init -l=java   -d=web --build=gradle my-app   # Java + Gradle
+  ```
+  Generated projects already include the Gradle wrapper, so the "every project
+  needs its wrapper committed" gotcha above doesn't apply to them.
+
+---
+
 ## ✏️ Customizing the program list
 
 Everything lives in `configuration.dsc.yaml`, under `resources:`. Each program is a block:
