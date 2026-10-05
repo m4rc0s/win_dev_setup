@@ -7,11 +7,13 @@ consistent.
 
 It uses **[winget](https://learn.microsoft.com/windows/package-manager/)** (the official
 Windows package manager) with **Configuration / DSC**: you describe *what* you want
-installed, and winget figures out *how* to reach that state. The toolchain itself runs
-**natively on Windows** — no WSL needed to write or run code day-to-day. WSL2 is used
-underneath as Podman's machine backend (its VM has to live somewhere), and optionally
-for SDKMAN-based JDK management on the Linux side — see [WSL extras](#-wsl-extras-optional)
-below.
+installed, and winget figures out *how* to reach that state. Most of the toolchain runs
+**natively on Windows** — no WSL needed to write or run code day-to-day. **WSL2 is a
+required dependency of this setup**, though: containers run through Podman, not Docker
+Desktop (see [Notes on a couple of choices](#-notes-on-a-couple-of-choices)), and
+Podman's Linux VM needs a backend to run on Windows — that's WSL2. Optionally, WSL2 is
+also used for SDKMAN-based JDK management on the Linux side — see
+[WSL2](#-wsl2-required-for-podman) below.
 
 ---
 
@@ -22,7 +24,7 @@ below.
 | `configuration.dsc.yaml` | **The heart of the setup.** Declarative list of every program (the machine's desired state). This is the file you edit. |
 | `bootstrap.ps1` | Script that checks winget, installs the one prerequisite the declarative file can't express (Visual Studio Build Tools' C++ workload), and installs the packages (everything, or a `-Profile` subset). This is the file you run. |
 | `vscode/` | VS Code "dotfiles" — tracked `settings.json` and `extensions.txt`, applied with `vscode\install.ps1`. See [VS Code profile](#-vs-code-profile-dotfiles) below. |
-| `wsl/install-sdkman.sh` | Installs SDKMAN inside a WSL distro. See [WSL extras](#-wsl-extras-optional) below. |
+| `wsl/install-sdkman.sh` | Installs SDKMAN inside a WSL distro. See [WSL2](#-wsl2-required-for-podman) below. |
 | `README.md` | This file. |
 
 ---
@@ -35,36 +37,10 @@ below.
 | AI / agent tooling | Claude (desktop app), Claude Code (CLI), Antigravity IDE, Antigravity CLI (`agy`) |
 | Editor | Visual Studio Code |
 | Languages & runtimes | Node.js (LTS), Bun, Python 3.13, Rust (via Rustup) + rust-analyzer, jabba (JDK manager) |
-| Containers | Podman (CLI only, no Docker Desktop / no GUI) |
+| Containers | Podman (CLI only, no Docker Desktop / no GUI) — needs WSL2, see below |
 | Databases | DBeaver Community |
 | Media | Spotify |
 | Build prerequisite | Visual Studio 2022 Build Tools (C++ workload) — installed by `bootstrap.ps1`, not in the DSC file |
-
-### Notes on a couple of choices
-
-- **JDK/JVM switching on Windows: `jabba`, not SDKMAN.** SDKMAN is a bash/Linux tool; on
-  native Windows it only works through workarounds (Git Bash plus manually-installed
-  `zip`/`unzip`, or WSL). For the native-Windows side, this setup uses
-  **[jabba](https://github.com/shyiko/jabba)** instead — same idea (`jabba install`,
-  `jabba use`), but works directly in PowerShell. See [Post-install steps](#-post-install-steps-one-time).
-  SDKMAN is also supported, but **inside WSL only**, for Linux-side JVM work — see
-  [WSL extras](#-wsl-extras-optional). These are two separate JDKs for two separate
-  environments, not a replacement for jabba.
-- **"Antigravity" is two different Google products in the winget catalog**: `Google.Antigravity`
-  (a standalone agent-orchestration hub) and `Google.AntigravityIDE` (the actual code
-  editor) + `Google.AntigravityCLI` (the terminal client, `agy`). This setup installs the
-  **IDE + CLI** pair. If you actually wanted the orchestration hub instead (or as well),
-  edit `configuration.dsc.yaml` and uncomment/add the `Google.Antigravity` block.
-- **Podman, CLI only — no Docker Desktop.** Linux containers can't run on the Windows
-  kernel directly; some VM has to sit underneath no matter which tool you use. Docker
-  Desktop and Podman Desktop just wrap that VM in a GUI app. Podman provisions the same
-  kind of VM from the command line instead (`podman machine init` / `podman machine
-  start`), so there's no desktop app, no GUI, and no Docker Desktop licensing to think
-  about. Podman's CLI is drop-in Docker-compatible — `Set-Alias docker podman` in your
-  PowerShell profile if you want the literal `docker` command to work too. The machine's
-  backend is **WSL2** (installed separately — see [WSL extras](#-wsl-extras-optional));
-  this is the one case where this setup does reach for WSL, since Podman on Windows has
-  no other way to run a Linux VM.
 
 ---
 
@@ -162,7 +138,7 @@ jabba alias default temurin@21
 rustup default stable-msvc
 
 # 4) Provision the Podman container engine (one-time, CLI only).
-#    Requires WSL2 with at least one distro installed - see WSL extras below.
+#    Requires WSL2 with at least one distro installed - see WSL2 below.
 podman machine init
 podman machine start
 podman run hello-world   # sanity check
@@ -172,15 +148,19 @@ podman run hello-world   # sanity check
 
 ---
 
-## 🐧 WSL extras (optional)
+## 🐧 WSL2 (required for Podman)
 
 WSL2 isn't installed by this repo's scripts — it's a Windows feature you install and
-manage yourself (`wsl --install`). Two things in this setup build on it once it's there:
+manage yourself (`wsl --install`). It's a **required dependency** of this setup, not an
+optional extra: this setup's container engine is Podman, not Docker Desktop (see
+[Notes on a couple of choices](#-notes-on-a-couple-of-choices)), and Podman's Linux VM
+needs WSL2 as its backend on Windows. Without WSL2 (and at least one distro installed),
+`podman machine init`/`start` has nothing to run on.
 
-- **Podman's machine backend.** `podman machine init` / `podman machine start` (see
-  [Post-install steps](#-post-install-steps-one-time)) provisions its Linux VM on top of
-  WSL2. A WSL distro must exist before you run those commands.
-- **SDKMAN, for JVM work done from inside WSL.** From inside a WSL shell (not
+- **Podman's machine backend (required).** `podman machine init` / `podman machine
+  start` (see [Post-install steps](#-post-install-steps-one-time)) provisions its Linux
+  VM on top of WSL2. Install WSL2 and at least one distro (`wsl --install`) first.
+- **SDKMAN, for JVM work done from inside WSL (optional).** From inside a WSL shell (not
   PowerShell), with the repo reachable at `/mnt/c/...`:
 
   ```bash
@@ -189,7 +169,7 @@ manage yourself (`wsl --install`). Two things in this setup build on it once it'
 
   This installs SDKMAN itself; it doesn't install a JDK for you. This is entirely
   separate from `jabba`, which keeps managing the JDK used on the native-Windows side
-  (see [Notes on a couple of choices](#notes-on-a-couple-of-choices)).
+  (see [Notes on a couple of choices](#-notes-on-a-couple-of-choices)).
 
 ### Known issue: Podman + WSL 3.0.1 cgroup error
 
@@ -292,14 +272,43 @@ winget upgrade --all
 
 ---
 
+## 🗒️ Notes on a couple of choices
+
+- **JDK/JVM switching on Windows: `jabba`, not SDKMAN.** SDKMAN is a bash/Linux tool; on
+  native Windows it only works through workarounds (Git Bash plus manually-installed
+  `zip`/`unzip`, or WSL). For the native-Windows side, this setup uses
+  **[jabba](https://github.com/shyiko/jabba)** instead — same idea (`jabba install`,
+  `jabba use`), but works directly in PowerShell. See [Post-install steps](#-post-install-steps-one-time).
+  SDKMAN is also supported, but **inside WSL only**, for Linux-side JVM work — see
+  [WSL2](#-wsl2-required-for-podman). These are two separate JDKs for two separate
+  environments, not a replacement for jabba.
+- **"Antigravity" is two different Google products in the winget catalog**: `Google.Antigravity`
+  (a standalone agent-orchestration hub) and `Google.AntigravityIDE` (the actual code
+  editor) + `Google.AntigravityCLI` (the terminal client, `agy`). This setup installs the
+  **IDE + CLI** pair. If you actually wanted the orchestration hub instead (or as well),
+  edit `configuration.dsc.yaml` and uncomment/add the `Google.Antigravity` block.
+- **Podman, CLI only — no Docker Desktop.** Linux containers can't run on the Windows
+  kernel directly; some VM has to sit underneath no matter which tool you use. Docker
+  Desktop and Podman Desktop just wrap that VM in a GUI app. Podman provisions the same
+  kind of VM from the command line instead (`podman machine init` / `podman machine
+  start`), so there's no desktop app, no GUI, and no Docker Desktop licensing to think
+  about. Podman's CLI is drop-in Docker-compatible — `Set-Alias docker podman` in your
+  PowerShell profile if you want the literal `docker` command to work too. Its machine
+  backend runs on **WSL2**, which is why this setup depends on it — see
+  [WSL2](#-wsl2-required-for-podman) below.
+
+---
+
 ## 📝 Notes
 
-- Requires **Windows 11** (build 22000+) and **App Installer / winget** (`winget --version`).
-  If missing: <https://aka.ms/getwinget>.
+- Requires **Windows 11** (build 22000+), **App Installer / winget**
+  (`winget --version`), and **WSL2** with at least one distro installed, which Podman's
+  container backend depends on — see [WSL2](#-wsl2-required-for-podman) below. If
+  winget is missing: <https://aka.ms/getwinget>.
 - System apps, games, and drivers (e.g. Steam, NVIDIA drivers, Store apps) are **left
   out on purpose** — this setup focuses on development tooling.
-- The native-Windows toolchain is the main focus of this repo. WSL2 only comes in as
-  Podman's machine backend and, optionally, for SDKMAN-based JVM work — see
-  [WSL extras](#-wsl-extras-optional). Installing WSL2 itself, and any further
-  Linux-side tooling beyond `wsl/install-sdkman.sh` (e.g. `apt`-based tooling), is left
-  to you — it's a deliberately separate concern from the native-Windows winget flow.
+- The native-Windows toolchain is the main focus of this repo; WSL2 is only a dependency
+  for Podman's container backend (and, optionally, for SDKMAN-based JVM work) — see
+  [WSL2](#-wsl2-required-for-podman). Installing WSL2 itself, and any further Linux-side
+  tooling beyond `wsl/install-sdkman.sh` (e.g. `apt`-based tooling), is left to you —
+  it's a deliberately separate concern from the native-Windows winget flow.
