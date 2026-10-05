@@ -7,7 +7,8 @@ consistent.
 
 It uses **[winget](https://learn.microsoft.com/windows/package-manager/)** (the official
 Windows package manager) with **Configuration / DSC**: you describe *what* you want
-installed, and winget figures out *how* to reach that state.
+installed, and winget figures out *how* to reach that state. Everything runs **natively
+on Windows** — no WSL, no Linux layer required.
 
 ---
 
@@ -16,8 +17,39 @@ installed, and winget figures out *how* to reach that state.
 | File | Purpose |
 |---|---|
 | `configuration.dsc.yaml` | **The heart of the setup.** Declarative list of every program (the machine's desired state). This is the file you edit. |
-| `bootstrap.ps1` | Script that checks winget and applies the configuration above. This is the file you run. |
+| `bootstrap.ps1` | Script that checks winget, installs the one prerequisite the declarative file can't express (Visual Studio Build Tools' C++ workload), and applies the configuration. This is the file you run. |
 | `README.md` | This file. |
+
+---
+
+## 🧰 What gets installed
+
+| Category | Tools |
+|---|---|
+| Core | Git, Windows Terminal, Neovim, .NET Desktop Runtime 9 |
+| AI / agent tooling | Claude (desktop app), Claude Code (CLI), Antigravity IDE, Antigravity CLI (`agy`) |
+| Editor | Visual Studio Code |
+| Languages & runtimes | Node.js (LTS), Bun, Python 3.13, Rust (via Rustup) + rust-analyzer, jabba (JDK manager) |
+| Containers | Docker Desktop, Podman Desktop |
+| Databases | DBeaver Community |
+| Media | Spotify |
+| Build prerequisite | Visual Studio 2022 Build Tools (C++ workload) — installed by `bootstrap.ps1`, not in the DSC file |
+
+### Notes on a couple of choices
+
+- **JDK/JVM switching: `jabba`, not SDKMAN.** SDKMAN is a bash/Linux tool; on native
+  Windows it only works through workarounds (Git Bash plus manually-installed `zip`/
+  `unzip`, or WSL). Since this setup stays 100% native, it uses
+  **[jabba](https://github.com/shyiko/jabba)** instead — same idea (`jabba install`,
+  `jabba use`), but works directly in PowerShell. See [Post-install steps](#-post-install-steps-one-time).
+- **"Antigravity" is two different Google products in the winget catalog**: `Google.Antigravity`
+  (a standalone agent-orchestration hub) and `Google.AntigravityIDE` (the actual code
+  editor) + `Google.AntigravityCLI` (the terminal client, `agy`). This setup installs the
+  **IDE + CLI** pair. If you actually wanted the orchestration hub instead (or as well),
+  edit `configuration.dsc.yaml` and uncomment/add the `Google.Antigravity` block.
+- **Docker Desktop and Podman Desktop** are both included, as requested. Both provision
+  their own container backend (a managed Windows VM/WSL distro) on first launch — that's
+  how containers work on Windows, independent of anything else in this setup.
 
 ---
 
@@ -33,11 +65,14 @@ In PowerShell, inside this folder:
 
 The script:
 1. Checks that `winget` is available (it ships with *App Installer* on Windows 11).
-2. Applies `configuration.dsc.yaml`, installing whatever is missing.
+2. Enables winget's *Configuration* feature if needed (requires admin the first time).
+3. Installs the Visual Studio Build Tools C++ workload (prerequisite for Rust/MSVC and
+   native Python extensions).
+4. Applies `configuration.dsc.yaml`, installing everything else.
 
-> **First time on a machine:** winget's *Configuration* feature is **off by default**.
-> `bootstrap.ps1` detects this and enables it automatically **if** run as Administrator.
-> Otherwise, enable it once in an **elevated** PowerShell:
+> **First time on a machine:** if step 2 needs Administrator rights and you're not
+> running elevated, the script tells you to run this once in an **elevated** PowerShell,
+> then re-run `.\bootstrap.ps1` normally:
 >
 > ```powershell
 > winget configure --enable
@@ -53,10 +88,43 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\bootstrap.ps1
 ```
 
+Already have a C++ toolchain and want to skip that step:
+
+```powershell
+.\bootstrap.ps1 -SkipBuildTools
+```
+
 ### Alternative (without the script)
 
 ```powershell
 winget configure -f configuration.dsc.yaml --accept-configuration-agreements
+```
+
+(This skips the Build Tools C++ workload step — run that part of `bootstrap.ps1`
+separately, or install it yourself, if you need it.)
+
+---
+
+## ✅ Post-install steps (one time)
+
+A few tools can't be fully configured by a package install alone:
+
+```powershell
+# 1) Open a NEW terminal first, so updated PATH entries take effect.
+
+# 2) Install a JDK and set it as default (jabba = SDKMAN-style JDK switching, native Windows)
+jabba ls-remote
+jabba install temurin@21       # example: Temurin 21 LTS
+jabba use temurin@21
+jabba alias default temurin@21
+
+# 3) Set the default Rust toolchain
+rustup default stable-msvc
+
+# 4) Launch Docker Desktop and/or Podman Desktop once each - they provision
+#    their own container backend on first run.
+
+# 5) Sign in where needed: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver.
 ```
 
 ---
@@ -110,3 +178,7 @@ winget upgrade --all
   If missing: <https://aka.ms/getwinget>.
 - System apps, games, and drivers (e.g. Steam, NVIDIA drivers, Store apps) are **left
   out on purpose** — this setup focuses on development tooling.
+- This setup is intentionally **native-Windows-only** (no WSL). If you later want a
+  Linux-flavored toolchain (e.g. the real SDKMAN, `apt`-based tooling) alongside this,
+  that would live in a separate script run inside WSL — it's a deliberately separate
+  concern from this repo.

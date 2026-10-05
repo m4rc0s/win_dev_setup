@@ -6,7 +6,12 @@
 .DESCRIPTION
     1. Checks that winget is available (ships with "App Installer" on Windows 11).
     2. Ensures winget's Configuration feature is enabled (requires admin the first time).
-    3. Applies configuration.dsc.yaml via `winget configure`.
+    3. Installs Visual Studio 2022 Build Tools with the C++ workload (prerequisite
+       for the Rust MSVC toolchain and native Python extensions) - this needs
+       installer override arguments that the declarative file cannot express.
+    4. Applies configuration.dsc.yaml via `winget configure` (everything else).
+    5. Prints the remaining one-time manual steps (JDK via jabba, Rust default
+       toolchain, container engines first run).
 
     Run from the project folder:
         .\bootstrap.ps1
@@ -20,7 +25,11 @@
 [CmdletBinding()]
 param(
     # Path to the configuration file (default: next to this script).
-    [string]$ConfigFile = (Join-Path $PSScriptRoot 'configuration.dsc.yaml')
+    [string]$ConfigFile = (Join-Path $PSScriptRoot 'configuration.dsc.yaml'),
+
+    # Skip the Visual Studio Build Tools step (e.g. if you already have a C++
+    # toolchain installed some other way).
+    [switch]$SkipBuildTools
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,6 +88,31 @@ if ($validate -match 'Extended features are not enabled') {
     Write-Host '    OK.' -ForegroundColor Green
 }
 
+# --- Visual Studio 2022 Build Tools (C++ workload) --------------------------
+# Needed for: the Rust MSVC toolchain (link.exe) and compiling native Python
+# extensions. Installed as a direct `winget install` call (not via the DSC
+# file) because selecting the workload requires installer override arguments.
+if (-not $SkipBuildTools) {
+    Write-Host '==> Installing Visual Studio 2022 Build Tools (C++ workload)...' -ForegroundColor Cyan
+    Write-Host '    (skip with -SkipBuildTools if you already have a C++ toolchain)' -ForegroundColor DarkGray
+
+    & $winget install `
+        --id Microsoft.VisualStudio.2022.BuildTools `
+        --source winget `
+        --accept-package-agreements `
+        --accept-source-agreements `
+        --disable-interactivity `
+        --override '--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended'
+
+    $btExit = $LASTEXITCODE
+    # -1978335189 (0x8A150013) = "no applicable update found" - already installed.
+    if ($btExit -eq 0 -or $btExit -eq -1978335189) {
+        Write-Host '    OK.' -ForegroundColor Green
+    } else {
+        Write-Warning "Build Tools install returned exit code $btExit. Continuing anyway - review the output above."
+    }
+}
+
 Write-Host "==> Applying configuration: $ConfigFile" -ForegroundColor Cyan
 Write-Host '    (this may take a while and prompt for UAC per package)' -ForegroundColor DarkGray
 
@@ -93,4 +127,19 @@ if ($exit -eq 0) {
 } else {
     Write-Warning "winget configure returned exit code $exit. Review the output above."
 }
+
+Write-Host ''
+Write-Host '==> One-time manual steps still needed:' -ForegroundColor Cyan
+Write-Host '    1) Open a NEW terminal (so updated PATH entries take effect).'
+Write-Host '    2) Install a JDK and set it as default with jabba:'
+Write-Host '         jabba ls-remote                  # list available JDKs'
+Write-Host '         jabba install temurin@21          # example: Temurin 21 LTS'
+Write-Host '         jabba use temurin@21'
+Write-Host '         jabba alias default temurin@21'
+Write-Host '    3) Set the default Rust toolchain:'
+Write-Host '         rustup default stable-msvc'
+Write-Host '    4) Launch Docker Desktop and/or Podman Desktop once to finish their'
+Write-Host '       first-run setup (they provision their own Windows container backend).'
+Write-Host '    5) Sign in: Claude, Claude Code, Antigravity IDE/CLI, Spotify, DBeaver connections.'
+
 exit $exit

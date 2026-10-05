@@ -5,7 +5,8 @@
 # ============================================================================
 #  Declarative file: describes the DESIRED STATE of the machine.
 #  Replicate everything with:  winget configure -f configuration.dsc.yaml
-#  (or simply run .\bootstrap.ps1)
+#  (or simply run .\bootstrap.ps1, which also handles the Visual Studio Build
+#  Tools workload that this file alone cannot express)
 #
 #  How to customize:
 #    - Add one block per program inside "resources:".
@@ -29,7 +30,7 @@ properties:
   # --- Programs to install ------------------------------------------------
   resources:
 
-    # ======================= CORE (already on your machine) =================
+    # ============================= CORE ======================================
 
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: git
@@ -67,16 +68,161 @@ properties:
         id: Microsoft.DotNet.DesktopRuntime.9
         source: winget
 
+    # ========================== AI / AGENT TOOLING ===========================
+
     - resource: Microsoft.WinGet.DSC/WinGetPackage
-      id: claude
+      id: claudeDesktop
       directives:
-        description: Claude (Anthropic)
+        description: Claude (Anthropic) - desktop app
         allowPrerelease: true
       settings:
         id: Anthropic.Claude
         source: winget
 
-    # ========================= SUGGESTIONS (optional) =======================
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: claudeCode
+      directives:
+        description: Claude Code - CLI
+        allowPrerelease: true
+      settings:
+        id: Anthropic.ClaudeCode
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: antigravityIde
+      directives:
+        description: Antigravity IDE (Google) - agent-first code editor
+        allowPrerelease: true
+      settings:
+        id: Google.AntigravityIDE
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: antigravityCli
+      directives:
+        description: Antigravity CLI / agy (Google) - terminal agent interface
+        allowPrerelease: true
+      settings:
+        id: Google.AntigravityCLI
+        source: winget
+
+    # ============================= EDITORS ====================================
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: vscode
+      directives:
+        description: Visual Studio Code
+        allowPrerelease: true
+      settings:
+        id: Microsoft.VisualStudioCode
+        source: winget
+
+    # ======================== LANGUAGES / RUNTIMES ============================
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: nodejs
+      directives:
+        description: Node.js LTS
+        allowPrerelease: true
+      settings:
+        id: OpenJS.NodeJS.LTS
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: bun
+      directives:
+        description: Bun - JS/TS runtime and package manager
+        allowPrerelease: true
+      settings:
+        id: Oven-sh.Bun
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: python
+      directives:
+        description: Python 3.13 (broadest third-party package compatibility)
+        allowPrerelease: true
+      settings:
+        id: Python.Python.3.13
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: rustup
+      directives:
+        description: Rustup - Rust toolchain installer/manager
+        allowPrerelease: true
+      settings:
+        id: Rustlang.Rustup
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: rustAnalyzer
+      directives:
+        description: rust-analyzer - Rust language server
+        allowPrerelease: true
+      settings:
+        id: Rustlang.rust-analyzer
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: jabba
+      directives:
+        description: jabba - Java/JDK version manager (native Windows SDKMAN alternative)
+        allowPrerelease: true
+      settings:
+        id: jabba-team.jabba
+        source: winget
+
+    # NOTE: Visual Studio 2022 Build Tools (C++ workload) is a hard prerequisite
+    # for the Rust MSVC toolchain and for compiling native Python extensions on
+    # Windows. The WinGetPackage DSC resource cannot pass the installer's
+    # --override arguments needed to select that workload, so it is installed
+    # by bootstrap.ps1 via a direct `winget install` call instead. See that
+    # script if you want to inspect or change the workload selection.
+
+    # ============================= CONTAINERS =================================
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: dockerDesktop
+      directives:
+        description: Docker Desktop
+        allowPrerelease: true
+      settings:
+        id: Docker.DockerDesktop
+        source: winget
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: podmanDesktop
+      directives:
+        description: Podman Desktop (bundles the podman CLI and machine)
+        allowPrerelease: true
+      settings:
+        id: RedHat.Podman-Desktop
+        source: winget
+
+    # ============================== DATABASES =================================
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: dbeaver
+      directives:
+        description: DBeaver Community - universal DB client
+        allowPrerelease: true
+      settings:
+        id: DBeaver.DBeaver.Community
+        source: winget
+
+    # ================================ MEDIA ====================================
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: spotify
+      directives:
+        description: Spotify
+        allowPrerelease: true
+      settings:
+        id: Spotify.Spotify
+        source: winget
+
+    # ========================= SUGGESTIONS (optional) =========================
     # Uncomment whatever you want. All ids were verified in the winget catalog.
     #
     # --- Shell / terminal ---
@@ -90,23 +236,7 @@ properties:
     #   directives: { description: Oh My Posh - prompt, allowPrerelease: true }
     #   settings: { id: JanDeDobbeleer.OhMyPosh, source: winget }
     #
-    # --- Editors / IDEs ---
-    # - resource: Microsoft.WinGet.DSC/WinGetPackage
-    #   id: vscode
-    #   directives: { description: Visual Studio Code, allowPrerelease: true }
-    #   settings: { id: Microsoft.VisualStudioCode, source: winget }
-    #
     # --- Languages / runtimes ---
-    # - resource: Microsoft.WinGet.DSC/WinGetPackage
-    #   id: nodejs
-    #   directives: { description: Node.js LTS, allowPrerelease: true }
-    #   settings: { id: OpenJS.NodeJS.LTS, source: winget }
-    #
-    # - resource: Microsoft.WinGet.DSC/WinGetPackage
-    #   id: python
-    #   directives: { description: Python 3, allowPrerelease: true }
-    #   settings: { id: Python.Python.3.13, source: winget }
-    #
     # - resource: Microsoft.WinGet.DSC/WinGetPackage
     #   id: go
     #   directives: { description: Go, allowPrerelease: true }
@@ -122,9 +252,3 @@ properties:
     #   id: sevenZip
     #   directives: { description: 7-Zip, allowPrerelease: true }
     #   settings: { id: 7zip.7zip, source: winget }
-    #
-    # --- Containers / infra ---
-    # - resource: Microsoft.WinGet.DSC/WinGetPackage
-    #   id: docker
-    #   directives: { description: Docker Desktop, allowPrerelease: true }
-    #   settings: { id: Docker.DockerDesktop, source: winget }
