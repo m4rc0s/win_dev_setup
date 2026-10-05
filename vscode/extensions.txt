@@ -1,0 +1,38 @@
+# VS Code extensions for this setup - one id per line, "#" for comments.
+# Applied by install.ps1 via `code --install-extension <id>`.
+# Find more ids at https://marketplace.visualstudio.com (the id is in the URL / sidebar).
+
+# --- Core: Java + Kotlin + Spring Boot + PostgreSQL + Git -------------------
+
+# Extension Pack for Java (Microsoft) - language support, debugger, test
+# runner, Maven, dependency viewer, IntelliCode.
+vscjava.vscode-java-pack
+
+# Spring Boot Extension Pack (VMware) - Spring Boot Tools, Spring Initializr,
+# Spring Boot Dashboard.
+vmware.vscode-boot-dev-pack
+
+# Kotlin by JetBrains - official Kotlin language support (completion,
+# diagnostics, navigation, formatting), powered by the Kotlin Language Server.
+jetbrains.kotlin-server
+
+# PostgreSQL (Microsoft) - connect, browse schemas, run queries with
+# IntelliSense. DBeaver (installed separately) remains the full DB client;
+# this is for quick queries without leaving the editor.
+ms-ossdata.vscode-pgsql
+
+# GitLens - supercharges VS Code's built-in Git support (blame, history,
+# comparisons).
+eamodio.gitlens
+
+# --- Nice to have (optional) - uncomment to install -------------------------
+
+# REST Client - call Spring Boot endpoints from plain .http files, no account
+# needed.
+# humao.rest-client
+
+# Better application.yml / docker-compose.yml editing (schema validation).
+# redhat.vscode-yaml
+
+# Respect .editorconfig files across projects/teams.
+# editorconfig.editorconfig
