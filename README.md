@@ -91,6 +91,7 @@ Install only a named subset instead of everything, for a specific stack:
 |---|---|
 | `all` (default) | Every package in `configuration.dsc.yaml` |
 | `java-kotlin` | Git, GitHub CLI, VS Code, jabba, Podman (CLI), DBeaver Community, Bruno — everything needed for Java/Kotlin + Spring Boot + PostgreSQL + Git, nothing else |
+| `utilities` | VS Code, DBeaver Community, Bruno — editor + DB client + API client, no language toolchain |
 
 A non-`all` profile automatically skips the Visual Studio Build Tools step too (no C++
 toolchain needed for JVM languages); pass `-SkipBuildTools:$false` to force it anyway.

@@ -53,7 +53,7 @@ param(
 
     # Install only a named subset of configuration.dsc.yaml instead of
     # everything. 'all' (default) installs the full file.
-    [ValidateSet('all', 'java-kotlin')]
+    [ValidateSet('all', 'java-kotlin', 'utilities')]
     [string]$Profile = 'all'
 )
 
@@ -71,6 +71,11 @@ $script:Profiles = @{
         'Podman.CLI',                    # run PostgreSQL via container
         'DBeaver.DBeaver.Community',     # PostgreSQL client/GUI
         'Bruno.Bruno'                    # API client for testing Spring Boot endpoints
+    )
+    'utilities' = @(
+        'Microsoft.VisualStudioCode',    # editor (see vscode/ for the dotfiles)
+        'DBeaver.DBeaver.Community',     # universal DB client
+        'Bruno.Bruno'                    # API client
     )
 }
 
@@ -127,7 +132,7 @@ if ($UseConfiguration -and $Profile -ne 'all') {
     exit 1
 }
 
-# Profiles other than 'all' are JVM-only right now - no C++ toolchain needed.
+# None of the non-'all' profiles need a C++ toolchain today.
 # Auto-skip Build Tools unless the caller explicitly asked for a value.
 if ($Profile -ne 'all' -and -not $PSBoundParameters.ContainsKey('SkipBuildTools')) {
     $SkipBuildTools = $true
