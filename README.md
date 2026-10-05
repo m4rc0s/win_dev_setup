@@ -65,21 +65,14 @@ In PowerShell, inside this folder:
 
 The script:
 1. Checks that `winget` is available (it ships with *App Installer* on Windows 11).
-2. Enables winget's *Configuration* feature if needed (requires admin the first time).
-3. Installs the Visual Studio Build Tools C++ workload (prerequisite for Rust/MSVC and
+2. Installs the Visual Studio Build Tools C++ workload (prerequisite for Rust/MSVC and
    native Python extensions).
-4. Applies `configuration.dsc.yaml`, installing everything else.
+3. Reads every package id out of `configuration.dsc.yaml` and installs each one with a
+   plain `winget install` call.
 
-> **First time on a machine:** if step 2 needs Administrator rights and you're not
-> running elevated, the script tells you to run this once in an **elevated** PowerShell,
-> then re-run `.\bootstrap.ps1` normally:
->
-> ```powershell
-> winget configure --enable
-> ```
-
-> Some packages require elevation — Windows shows the UAC prompt when needed.
-> Running PowerShell **as Administrator** avoids several prompts along the way.
+**No admin pre-step and no elevated terminal needed.** A handful of packages (e.g.
+Docker Desktop) may trigger their own UAC prompt mid-install — just click through it
+when it appears.
 
 If script execution is blocked, allow it just for the current session:
 
@@ -94,14 +87,28 @@ Already have a C++ toolchain and want to skip that step:
 .\bootstrap.ps1 -SkipBuildTools
 ```
 
-### Alternative (without the script)
+### Alternative: `winget configure` (DSC engine)
+
+`configuration.dsc.yaml` is also a valid file for winget's declarative `configure`
+subcommand, if you prefer that engine's convergence semantics. It requires enabling an
+experimental feature **once**, as Administrator:
 
 ```powershell
-winget configure -f configuration.dsc.yaml --accept-configuration-agreements
+winget configure --enable
 ```
 
-(This skips the Build Tools C++ workload step — run that part of `bootstrap.ps1`
-separately, or install it yourself, if you need it.)
+> This step has been unreliable in practice: the elevated PowerShell window it needs to
+> run in can end up resolving a different user context, where `winget.exe` isn't
+> registered at all ("winget not found"). If that happens, this is exactly why
+> `bootstrap.ps1` defaults to the plain-install loop instead — no admin pre-step needed.
+
+Once enabled, run either:
+
+```powershell
+.\bootstrap.ps1 -UseConfiguration
+# or, without the script:
+winget configure -f configuration.dsc.yaml --accept-configuration-agreements
+```
 
 ---
 
