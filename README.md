@@ -39,6 +39,7 @@ also used for SDKMAN-based JDK management on the Linux side — see
 | Languages & runtimes | Node.js (LTS), Bun, Python 3.13, Rust (via Rustup) + rust-analyzer, jabba (JDK manager) |
 | Containers | Podman (CLI only, no Docker Desktop / no GUI) — needs WSL2, see below |
 | Databases | DBeaver Community |
+| API tooling | Bruno (open-source, offline-first API client) |
 | Media | Spotify |
 | Build prerequisite | Visual Studio 2022 Build Tools (C++ workload) — installed by `bootstrap.ps1`, not in the DSC file |
 
@@ -89,7 +90,7 @@ Install only a named subset instead of everything, for a specific stack:
 | Profile | Installs |
 |---|---|
 | `all` (default) | Every package in `configuration.dsc.yaml` |
-| `java-kotlin` | Git, GitHub CLI, VS Code, jabba, Podman (CLI), DBeaver Community — everything needed for Java/Kotlin + Spring Boot + PostgreSQL + Git, nothing else |
+| `java-kotlin` | Git, GitHub CLI, VS Code, jabba, Podman (CLI), DBeaver Community, Bruno — everything needed for Java/Kotlin + Spring Boot + PostgreSQL + Git, nothing else |
 
 A non-`all` profile automatically skips the Visual Studio Build Tools step too (no C++
 toolchain needed for JVM languages); pass `-SkipBuildTools:$false` to force it anyway.

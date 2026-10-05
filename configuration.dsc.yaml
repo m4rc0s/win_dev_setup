@@ -219,6 +219,17 @@ properties:
         id: DBeaver.DBeaver.Community
         source: winget
 
+    # ============================= API TOOLING =================================
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: bruno
+      directives:
+        description: Bruno - open-source, offline-first API client (Postman alternative)
+        allowPrerelease: true
+      settings:
+        id: Bruno.Bruno
+        source: winget
+
     # ================================ MEDIA ====================================
 
     - resource: Microsoft.WinGet.DSC/WinGetPackage

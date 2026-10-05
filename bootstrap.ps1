@@ -69,7 +69,8 @@ $script:Profiles = @{
         'Microsoft.VisualStudioCode',    # editor (see vscode/ for the dotfiles)
         'jabba-team.jabba',              # JDK/JVM version manager
         'Podman.CLI',                    # run PostgreSQL via container
-        'DBeaver.DBeaver.Community'      # PostgreSQL client/GUI
+        'DBeaver.DBeaver.Community',     # PostgreSQL client/GUI
+        'Bruno.Bruno'                    # API client for testing Spring Boot endpoints
     )
 }
 
